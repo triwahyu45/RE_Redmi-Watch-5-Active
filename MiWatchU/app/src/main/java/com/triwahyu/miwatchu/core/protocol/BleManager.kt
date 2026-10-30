@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothSocket
 import android.content.Context
@@ -34,9 +35,11 @@ object BleManager {
     const val IRQ_KEY = "a342fe2b01c272c445f2fedae2683ac9"
     const val PHONE_ID = "50bb3"
 
-    // Standard SPP (Serial Port Profile / RFCOMM) & Xiaomi BLE UUIDs
-    private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-    private val XIAOMI_SERVICE_UUID = UUID.fromString("0000FE95-0000-1000-8000-00805F9B34FB")
+    // EXACT Proprietary Xiaomi Wearable L1 Transport UUIDs (Extracted from DEX)
+    val WEARABLE_SERVICE_UUID: UUID = UUID.fromString("00001000-1720-0206-0100-00805f9bab34")
+    val WEARABLE_CHAR_UUID: UUID    = UUID.fromString("00002000-1720-0206-0100-00805f9bab34")
+    val CCCD_UUID: UUID             = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+    val SPP_UUID: UUID              = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     private var activeDevice: BluetoothDevice? = null
     private var sppSocket: BluetoothSocket? = null
@@ -44,7 +47,7 @@ object BleManager {
     private var sppInputStream: InputStream? = null
 
     private var bluetoothGatt: BluetoothGatt? = null
-    private var writeCharacteristic: BluetoothGattCharacteristic? = null
+    private var l1Characteristic: BluetoothGattCharacteristic? = null
 
     private val _connectionState = MutableStateFlow(BluetoothProfile.STATE_DISCONNECTED)
     val connectionState: StateFlow<Int> = _connectionState
@@ -103,9 +106,8 @@ object BleManager {
         _targetMac.value = device.address
         _statusMessage.value = "Menghubungkan ke ${device.name ?: device.address}..."
 
-        // Prioritas 1: Hubungkan lewat Bluetooth Classic SPP (RFCOMM Serial Stream)
+        // Prioritas 1: Bluetooth Classic SPP (RFCOMM Serial Stream)
         CoroutineScope(Dispatchers.IO).launch {
-            var connectedSpp = false
             try {
                 Log.i(TAG, "Attempting SPP connection to ${device.address}...")
                 val socket = try {
@@ -118,18 +120,16 @@ object BleManager {
                 sppSocket = socket
                 sppOutputStream = socket.outputStream
                 sppInputStream = socket.inputStream
-                connectedSpp = true
                 _connectionState.value = BluetoothProfile.STATE_CONNECTED
-                _statusMessage.value = "✅ SPP Terkoneksi! Jalur independen aktif."
+                _statusMessage.value = "✅ SPP Terkoneksi! Jalur komunikasi aktif."
                 Log.i(TAG, "SPP Connected successfully!")
 
-                // Kirim L1 Auth Handshake
                 sendAuthHandshake()
             } catch (e: Exception) {
                 Log.w(TAG, "SPP connection failed: ${e.message}, falling back to BLE GATT...")
             }
 
-            // Prioritas 2 / Paralel: BLE GATT
+            // Prioritas 2: Wearable BLE GATT Service (00001000-1720-0206-0100-00805f9bab34)
             connectGatt(context, device)
         }
     }
@@ -139,7 +139,7 @@ object BleManager {
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 _connectionState.value = newState
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
-                    _statusMessage.value = "✅ BLE GATT Terhubung! Mengatur MTU 512..."
+                    _statusMessage.value = "✅ BLE Terhubung! Mengatur MTU 512..."
                     gatt?.requestMtu(512)
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     if (sppSocket?.isConnected != true) {
@@ -154,13 +154,35 @@ object BleManager {
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    _statusMessage.value = "✅ Layanan Ditemukan! Siap kirim data independen."
-                    gatt?.services?.forEach { service ->
-                        service.characteristics.forEach { char ->
-                            if ((char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0 ||
-                                (char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0) {
-                                writeCharacteristic = char
+                if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
+                    // Cari Service Resmi Wearable L1 Transport
+                    val service = gatt.getService(WEARABLE_SERVICE_UUID)
+                    if (service != null) {
+                        val characteristic = service.getCharacteristic(WEARABLE_CHAR_UUID)
+                        if (characteristic != null) {
+                            l1Characteristic = characteristic
+                            // Enable notification on Wearable Characteristic
+                            gatt.setCharacteristicNotification(characteristic, true)
+                            val descriptor = characteristic.getDescriptor(CCCD_UUID)
+                            if (descriptor != null) {
+                                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                                gatt.writeDescriptor(descriptor)
+                            }
+                            _statusMessage.value = "✅ Jalur Xiaomi Wearable L1 Aktif! Siap kirim perintah."
+                            Log.i(TAG, "Xiaomi Wearable L1 Characteristic hooked successfully!")
+                            sendAuthHandshake()
+                            return
+                        }
+                    }
+
+                    // Fallback jika UUID proprietary berbeda di mode tertentu
+                    _statusMessage.value = "✅ Layanan Ditemukan! Mengaitkan characteristic..."
+                    for (srv in gatt.services) {
+                        for (chr in srv.characteristics) {
+                            if ((chr.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0 ||
+                                (chr.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0) {
+                                l1Characteristic = chr
+                                break
                             }
                         }
                     }
@@ -170,7 +192,6 @@ object BleManager {
     }
 
     private fun sendAuthHandshake() {
-        // L1 Auth initialization payload
         val authPayload = ByteArray(20)
         authPayload[0] = 0x01 // Subsystem Auth
         authPayload[1] = 0x01 // Init challenge
@@ -232,7 +253,7 @@ object BleManager {
     fun sendL1Packet(packet: L1Packet) {
         val rawBytes = packet.toByteArray()
 
-        // Kirim via SPP jika tersedia
+        // 1. Kirim via SPP jika tersedia
         val out = sppOutputStream
         if (sppSocket?.isConnected == true && out != null) {
             try {
@@ -245,15 +266,15 @@ object BleManager {
             }
         }
 
-        // Kirim via BLE GATT sebagai alternatif
+        // 2. Kirim via Wearable L1 Characteristic
         val gatt = bluetoothGatt
-        val char = writeCharacteristic
+        val char = l1Characteristic
         if (gatt != null && char != null) {
             char.value = rawBytes
             gatt.writeCharacteristic(char)
-            Log.d(TAG, "Sent ${rawBytes.size} bytes via BLE GATT")
+            Log.d(TAG, "Sent ${rawBytes.size} bytes via Wearable L1 Characteristic (${char.uuid})")
         } else {
-            Log.w(TAG, "Neither SPP nor BLE GATT is currently connected.")
+            Log.w(TAG, "Neither SPP nor Wearable L1 Characteristic is currently connected.")
         }
     }
 }
