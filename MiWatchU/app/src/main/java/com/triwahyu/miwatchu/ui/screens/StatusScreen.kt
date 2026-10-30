@@ -16,28 +16,30 @@ import com.triwahyu.miwatchu.ui.theme.*
 fun StatusScreen() {
     val context = LocalContext.current
     val statusMessage by BleManager.statusMessage.collectAsState()
-    var macAddress by remember { mutableStateOf("XX:XX:XX:XX:B5:83") }
+    val targetMac by BleManager.targetMac.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("ℹ️ Status & Perangkat", style = MaterialTheme.typography.titleMedium, color = NeonCyan)
-        Text("Monitoring koneksi langsung Bluetooth & Forwarder Notifikasi", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+        Text("ℹ️ Status & Kredensial Independen", style = MaterialTheme.typography.titleMedium, color = NeonCyan)
+        Text("Koneksi langsung tanpa server Mi Fitness (Auth Token & SPP/BLE)", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CyberSurface)) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Target Smartwatch:", color = NeonAmber, style = MaterialTheme.typography.titleSmall)
+                Text("Smartwatch Terdeteksi:", color = NeonAmber, style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Nama: Redmi Watch 5 Active", color = TextPrimary)
                 Text("Model: ${BleManager.DEFAULT_MODEL} (SiFli SF32LB551)", color = TextSecondary)
+                Text("Firmware: ${BleManager.FIRMWARE_VERSION} (Official Dumped)", color = TextSecondary)
                 Text("Device ID (DID): ${BleManager.DEFAULT_DID}", color = TextSecondary)
-                Text("Alamat MAC: $macAddress", color = TextSecondary)
+                Text("MAC: $targetMac", color = TextSecondary)
+                Text("Token: ${BleManager.AUTH_TOKEN.take(8)}... (Authentic)", color = NeonGreen)
 
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = CyberBlack)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text("Status Koneksi: $statusMessage", color = NeonGreen)
+                Text("Status: $statusMessage", color = NeonCyan)
             }
         }
 
@@ -64,16 +66,23 @@ fun StatusScreen() {
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Button(
             onClick = {
-                BleManager.connect(context, macAddress)
+                BleManager.connect(context)
             },
             colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("🔄 Sambungkan Bluetooth ke Jam", color = CyberBlack)
+            Text("🔄 Sambungkan Bluetooth Langsung (SPP & BLE)", color = CyberBlack)
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "💡 Tips: Jika jam belum merespon, 'Force Stop' Mi Fitness di Pengaturan HP agar koneksi Bluetooth tidak bentrok / dibajak.",
+            color = NeonAmber,
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
