@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun FlashOSScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isFlashing by remember { mutableStateOf(false) }
     var flashProgress by remember { mutableFloatStateOf(0f) }
@@ -89,7 +90,23 @@ fun FlashOSScreen() {
             onClick = {
                 if (isFlashing) return@Button
                 isFlashing = true
+                statusText = "Memeriksa koneksi Bluetooth ke jam..."
                 coroutineScope.launch {
+                    if (!BleManager.isConnected()) {
+                        BleManager.connect(context)
+                        var retry = 0
+                        while (!BleManager.isConnected() && retry < 8) {
+                            delay(500)
+                            retry++
+                        }
+                    }
+
+                    if (!BleManager.isConnected()) {
+                        statusText = "❌ Bluetooth belum terhubung! Silakan Force Stop Mi Fitness di Pengaturan HP."
+                        isFlashing = false
+                        return@launch
+                    }
+
                     withContext(Dispatchers.Default) {
                         statusText = "Membangun antarmuka WatchU OS (LVGL biner 0x1234A55A)..."
                         

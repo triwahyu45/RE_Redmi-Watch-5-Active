@@ -15,18 +15,16 @@ import com.triwahyu.miwatchu.ui.screens.*
 import com.triwahyu.miwatchu.ui.theme.*
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
-    object FlashOS : Screen("flash", "Flash OS", Icons.Default.Build)
+    object RunningText : Screen("running_text", "Running Text", Icons.Default.PlayArrow)
+    object Pairing : Screen("pairing", "Pairing Jam", Icons.Default.Share)
+    object WatchApps : Screen("calculator", "Kalkulator", Icons.Default.Edit)
     object Studio : Screen("studio", "Watchface", Icons.Default.Face)
-    object Interactive : Screen("interactive", "Fitur Jam", Icons.Default.PlayArrow)
-    object Toggles : Screen("toggles", "Kontrol", Icons.Default.Settings)
-    object Status : Screen("status", "Koneksi", Icons.Default.Info)
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Tanpa popup atau redirect otomatis saat app dibuka agar tidak mengganggu aktivitas pengguna
         setContent {
             MiWatchUTheme {
                 MainApp()
@@ -38,13 +36,12 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainApp() {
-    var selectedScreen by remember { mutableStateOf<Screen>(Screen.Studio) }
+    var selectedScreen by remember { mutableStateOf<Screen>(Screen.RunningText) }
     val screens = listOf(
-        Screen.Studio,
-        Screen.FlashOS,
-        Screen.Interactive,
-        Screen.Toggles,
-        Screen.Status
+        Screen.RunningText,
+        Screen.Pairing,
+        Screen.WatchApps,
+        Screen.Studio
     )
 
     Scaffold(
@@ -81,11 +78,10 @@ fun MainApp() {
                 .padding(padding)
         ) {
             when (selectedScreen) {
+                is Screen.RunningText -> SyncRunningTextScreen()
+                is Screen.Pairing -> PairingScreen()
+                is Screen.WatchApps -> WatchAppsScreen()
                 is Screen.Studio -> WatchfaceStudioScreen()
-                is Screen.FlashOS -> FlashOSScreen()
-                is Screen.Interactive -> InteractiveScreen()
-                is Screen.Toggles -> TogglesScreen()
-                is Screen.Status -> StatusScreen()
             }
         }
     }

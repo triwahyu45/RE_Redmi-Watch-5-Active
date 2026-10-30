@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun WatchfaceStudioScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var clockX by remember { mutableStateOf(40f) }
     var clockY by remember { mutableStateOf(100f) }
@@ -255,9 +256,24 @@ fun WatchfaceStudioScreen() {
             onClick = {
                 if (isSending) return@Button
                 isSending = true
-                compileStatus = "Mengompilasi frame tema $selectedTheme..."
+                compileStatus = "Memeriksa koneksi Bluetooth ke jam..."
 
                 coroutineScope.launch {
+                    if (!BleManager.isConnected()) {
+                        BleManager.connect(context)
+                        var retry = 0
+                        while (!BleManager.isConnected() && retry < 8) {
+                            kotlinx.coroutines.delay(500)
+                            retry++
+                        }
+                    }
+
+                    if (!BleManager.isConnected()) {
+                        compileStatus = "❌ Bluetooth belum terhubung! Silakan Force Stop Mi Fitness di Pengaturan HP."
+                        isSending = false
+                        return@launch
+                    }
+
                     val colorObj = colors[selectedColorIndex].second
                     val intColor = android.graphics.Color.rgb((colorObj.red * 255).toInt(), (colorObj.green * 255).toInt(), (colorObj.blue * 255).toInt())
 
