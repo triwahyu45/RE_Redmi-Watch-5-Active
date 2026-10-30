@@ -1,0 +1,22 @@
+# Built APKs and binaries
+*.apk
+app/base.apk
+*.aab
+
+# Gradle & Android build artifacts
+.gradle/
+build/
+**/build/
+local.properties
+.cxx/
+.idea/
+*.iml
+
+# OS and Log files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Research nested repo or temporary HTML dumps
+research/blog_article.html
