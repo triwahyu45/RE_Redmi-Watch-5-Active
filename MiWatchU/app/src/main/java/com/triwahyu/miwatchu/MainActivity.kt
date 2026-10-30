@@ -17,16 +17,16 @@ import com.triwahyu.miwatchu.ui.theme.*
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object FlashOS : Screen("flash", "Flash OS", Icons.Default.Build)
     object Studio : Screen("studio", "Watchface", Icons.Default.Face)
-    object Marquee : Screen("marquee", "Running Text", Icons.Default.PlayArrow)
-    object Toggles : Screen("toggles", "Fitur", Icons.Default.Settings)
-    object Status : Screen("status", "Status", Icons.Default.Info)
+    object Interactive : Screen("interactive", "Fitur Jam", Icons.Default.PlayArrow)
+    object Toggles : Screen("toggles", "Kontrol", Icons.Default.Settings)
+    object Status : Screen("status", "Koneksi", Icons.Default.Info)
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Tidak lagi membuka pop-up izin otomatis agar tidak mengganggu aktivitas pengguna di HP
+        // Tanpa popup atau redirect otomatis saat app dibuka agar tidak mengganggu aktivitas pengguna
         setContent {
             MiWatchUTheme {
                 MainApp()
@@ -38,11 +38,11 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainApp() {
-    var selectedScreen by remember { mutableStateOf<Screen>(Screen.FlashOS) }
+    var selectedScreen by remember { mutableStateOf<Screen>(Screen.Studio) }
     val screens = listOf(
-        Screen.FlashOS,
         Screen.Studio,
-        Screen.Marquee,
+        Screen.FlashOS,
+        Screen.Interactive,
         Screen.Toggles,
         Screen.Status
     )
@@ -61,7 +61,14 @@ fun MainApp() {
                         selected = selectedScreen == screen,
                         onClick = { selectedScreen = screen },
                         icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) }
+                        label = { Text(screen.title) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = CyberBlack,
+                            selectedTextColor = NeonCyan,
+                            indicatorColor = NeonCyan,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        )
                     )
                 }
             }
@@ -74,9 +81,9 @@ fun MainApp() {
                 .padding(padding)
         ) {
             when (selectedScreen) {
-                is Screen.FlashOS -> FlashOSScreen()
                 is Screen.Studio -> WatchfaceStudioScreen()
-                is Screen.Marquee -> MarqueeScreen()
+                is Screen.FlashOS -> FlashOSScreen()
+                is Screen.Interactive -> InteractiveScreen()
                 is Screen.Toggles -> TogglesScreen()
                 is Screen.Status -> StatusScreen()
             }

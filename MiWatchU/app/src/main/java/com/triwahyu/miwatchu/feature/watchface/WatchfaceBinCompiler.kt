@@ -106,6 +106,73 @@ object WatchfaceBinCompiler {
         return composite
     }
 
+    fun generateThemedFrames(
+        theme: String,
+        frameCount: Int
+    ): List<Bitmap> {
+        val list = mutableListOf<Bitmap>()
+        val count = frameCount.coerceAtLeast(1)
+
+        for (i in 0 until count) {
+            val bmp = Bitmap.createBitmap(WATCH_WIDTH, WATCH_HEIGHT, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            val phase = (i.toFloat() / count.toFloat()) * (2f * Math.PI.toFloat())
+
+            when (theme) {
+                "Cyber Neon" -> {
+                    // Dark background with pulsating cyan-purple ring
+                    canvas.drawColor(android.graphics.Color.rgb(10, 12, 18))
+                    val paintRing = Paint().apply {
+                        color = android.graphics.Color.argb((140 + 60 * Math.sin(phase.toDouble())).toInt(), 0, 229, 255)
+                        style = Paint.Style.STROKE
+                        strokeWidth = 6f
+                        isAntiAlias = true
+                    }
+                    canvas.drawCircle(WATCH_WIDTH / 2f, WATCH_HEIGHT / 2f, 110f + 8f * Math.sin(phase.toDouble()).toFloat(), paintRing)
+
+                    val paintGrid = Paint().apply {
+                        color = android.graphics.Color.argb(35, 189, 0, 255)
+                        strokeWidth = 1f
+                    }
+                    for (x in 0..WATCH_WIDTH step 40) {
+                        canvas.drawLine(x.toFloat(), 0f, x.toFloat(), WATCH_HEIGHT.toFloat(), paintGrid)
+                    }
+                    for (y in 0..WATCH_HEIGHT step 40) {
+                        canvas.drawLine(0f, y.toFloat(), WATCH_WIDTH.toFloat(), y.toFloat(), paintGrid)
+                    }
+                }
+                "Titanium Luxury" -> {
+                    // Brushed slate with warm gold geometric accent
+                    canvas.drawColor(android.graphics.Color.rgb(22, 24, 29))
+                    val paintAccent = Paint().apply {
+                        color = android.graphics.Color.rgb(255, 184, 0)
+                        style = Paint.Style.STROKE
+                        strokeWidth = 4f
+                        isAntiAlias = true
+                    }
+                    canvas.drawRoundRect(20f, 20f, WATCH_WIDTH - 20f, WATCH_HEIGHT - 20f, 24f, 24f, paintAccent)
+                }
+                "Emerald Matrix" -> {
+                    // Pure OLED black with dynamic green telemetry bars
+                    canvas.drawColor(android.graphics.Color.BLACK)
+                    val paintBar = Paint().apply {
+                        color = android.graphics.Color.rgb(0, 255, 157)
+                        strokeWidth = 3f
+                    }
+                    val barHeight = 60f + 30f * Math.sin(phase.toDouble()).toFloat()
+                    canvas.drawLine(24f, WATCH_HEIGHT - 40f, 24f, WATCH_HEIGHT - 40f - barHeight, paintBar)
+                    canvas.drawLine(34f, WATCH_HEIGHT - 40f, 34f, WATCH_HEIGHT - 40f - (barHeight * 0.7f), paintBar)
+                }
+                else -> {
+                    // Minimalist OLED Slate
+                    canvas.drawColor(android.graphics.Color.rgb(14, 15, 18))
+                }
+            }
+            list.add(bmp)
+        }
+        return list
+    }
+
     fun compile(
         frames: List<Bitmap>,
         clockConfig: ClockConfig,
